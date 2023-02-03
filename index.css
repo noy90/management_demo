@@ -1,0 +1,28 @@
+.main {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.main p {
+    margin: 0;
+}
+
+.main button {
+    margin: 7px;
+}
+
+.main #form {
+    flex-basis: 15%;
+    min-width: 250px
+}
+
+.main #map {
+    margin-top: 1px;
+    height: 500px;
+    flex-basis: 50%;
+    min-width: 500px;
+}
+
+table {
+    margin-top: 30px;
+}

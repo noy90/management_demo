@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <style>
+        table {
+            width: 50%;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+    <link rel="stylesheet" href="./index.css">
+    <title>test</title>
+</head>
+
+<body>
+    <div id="app" class="main">
+        <div id="form">
+            <p>{{message}}</p>
+            <p>CP名称</p>
+            <input type="text" v-model="title">
+            <p>CP種別</p>
+            <select v-model="type">
+                <option value="start">スタート</option>
+                <option value="goal">ゴール</option>
+                <option value="passing">通過ポイント</option>
+                <option value="checkpoint">チェックポイント</option>
+            </select>
+            <p>緯度</p>
+            <input type="number" v-model="latitude">
+            <p>経度</p>
+            <input type="number" v-model="longitude">
+            <p>CP順序</p>
+            <input type="number" v-model="order">
+            <p>有効な範囲 (単位: メートル)</p>
+            <input type="number" v-model="radius">
+            <p>到着出発の履歴の有効フラグ</p>
+            <input type="checkbox" v-model="history">
+            <br>
+            <template v-if="!editedItem">
+                <!-- editedItem がない場合の HTML -->
+                <button @click="serchMap">検索</button>
+                <button @click="updateItems">設定</button>
+                <!-- error message -->
+                <div style="color: red;">{{ errorMessage }}</div>
+            </template>
+            <template v-else>
+                <button @click="fixItems">修正</button>
+                <button @click="editItemEnd">もどる</button>
+            </template>
+        </div>
+
+        <template v-if="!editedItem">
+            <!-- editedItem がない場合の HTML -->
+            <div id="map"></div>
+            <br>
+            <table>
+                <tr>
+                    <th>title</th>
+                    <th>type</th>
+                    <th>latitude</th>
+                    <th>longitude</th>
+                    <th>order</th>
+                    <th>radius</th>
+                    <th>history</th>
+                    <th> </th>
+                    <th> </th>
+                </tr>
+                <tr v-for="(item, index) in items">
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.type }}</td>
+                    <td>{{ item.latitude }}</td>
+                    <td>{{ item.longitude }}</td>
+                    <td>{{ item.order }}</td>
+                    <td>{{ item.radius }}</td>
+                    <td>{{ item.history }}</td>
+                    <td><button @click="displayMap(item)">表示</button></td>
+                    <td><button @click="editItem(item, index)">Edit</button></td>
+                </tr>
+            </table>
+        </template>
+    </div>
+    <script>
+        // マップの初期位置、倍率
+        const place = [35.6978368, 139.4137252];
+        const rate = 14;
+        new Vue({
+            el: "#app",
+            data() {
+                return {
+                    title: "",
+                    type: "",
+                    latitude: "",
+                    longitude: "",
+                    order: "",
+                    radius: "",
+                    history: false,
+
+                    map: null,
+                    marker: null,
+                    circle: null,
+                    items: [],
+                    editedItem: null,
+
+                    message: "",
+                    errorFlag: true,
+                    errorMessage: ""
+                };
+            },
+            mounted() {
+                this.map = L.map("map").setView(place, rate);
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(this.map);
+            },
+            methods: {
+                serchMap() {
+                    // errorFlagでエラーメッセージを表示させるかどうか
+                    if (this.errorFlag) {
+                        if (this.latitude === "" || this.longitude === "") {
+                            this.errorMessage = "検索機能 入力必須: 緯度、経度";
+                            return;
+                        } else {
+                            this.errorMessage = "";
+                        };
+                    } else {
+                        this.errorFlag = true;
+                    }
+                    // 半径は初期値100
+                    if (this.radius === "") this.radius = 100;
+
+                    this.map.setView([this.latitude, this.longitude], 14);
+
+                    if (this.marker) {
+                        this.map.removeLayer(this.marker);
+                    }
+
+                    if (this.circle) {
+                        this.map.removeLayer(this.circle);
+                    }
+
+                    this.marker = L.marker([this.latitude, this.longitude]).addTo(this.map);
+                    this.circle = L.circle([this.latitude, this.longitude], {
+                        radius: this.radius
+                    }).addTo(this.map);
+
+                },
+                updateItems() {
+                    if (this.title === "" || this.type === "" || this.longitude === "" || this.longitude === "" || this.order == "") {
+                        this.errorMessage = "設定機能 入力必須: CP名称、CP種別、緯度、経度、CP順序";
+                        return;
+                    } else {
+                        this.errorMessage = ""
+                    };
+
+                    this.items.unshift({
+                        title: this.title,
+                        type: this.type,
+                        latitude: this.latitude,
+                        longitude: this.longitude,
+                        order: this.order,
+                        radius: this.radius,
+                        history: this.history
+                    });
+
+                },
+                editItem(item, index) {
+                    // 修正したい内容を入力欄に代入
+                    Object.assign(this, item);
+                    // 対象indexを保持
+                    this.editedItem = { index };
+                    this.message = "修正画面　完了したら修正ボタンを押してください";
+
+                },
+                editItemEnd() {
+                    this.editedItem = null;
+                    // this.$nextTickがないと画面更新前に実行されて、エラーが発生するので注意
+                    this.$nextTick(function () {
+                        this.map = L.map("map").setView(place, rate);
+                        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        }).addTo(this.map);
+                        if (this.latitude !== "" && this.longitude !== "") {
+                            this.errorFlag = false;
+                            this.serchMap()
+                        };
+                    });
+                    this.message = "";
+
+                },
+                fixItems() {
+                    // 簡略化した方でやったらバグったのでこれに変更
+                    console.log(this.editedItem.index, this.items)
+                    this.items[this.editedItem.index].title = this.title;
+                    this.items[this.editedItem.index].type = this.type;
+                    this.items[this.editedItem.index].latitude = this.latitude;
+                    this.items[this.editedItem.index].longitude = this.longitude;
+                    this.items[this.editedItem.index].order = this.order;
+                    this.items[this.editedItem.index].radius = this.radius;
+                    this.items[this.editedItem.index].history = this.history;
+                    this.editItemEnd()
+
+                },
+                displayMap(item) {
+                    this.map.setView([item.latitude, item.longitude], 14);
+                    if (this.marker) {
+                        this.map.removeLayer(this.marker);
+                    }
+                    if (this.circle) {
+                        this.map.removeLayer(this.circle);
+                    }
+                    this.marker = L.marker([item.latitude, item.longitude]).addTo(this.map);
+                    this.circle = L.circle([item.latitude, item.longitude], {
+                        radius: this.radius
+                    }).addTo(this.map);
+                }
+
+            }
+        });
+
+
+    </script>
+</body>
+
+</html>
